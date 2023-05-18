@@ -28,11 +28,34 @@ function pod_basis_multirank(training_solutions, model_spaces, ranks)
     spectrum = reverse(max.(C_eigs.values, 0))
     energy_fractions = Dict{Int, Float64}(
         rank => sum(spectrum[1:rank])/sum(spectrum) for rank in ranks)
-    Bs, energy_fractions, spectrum
+    Bs, energy_fractions
 end
 
 function pod_basis(training_solutions, model_spaces, rank)
     return pod_basis_multirank(training_solutions, model_spaces, [rank])[rank]
+end
+
+function compress_A_f_basis(B, A_basis, f_basis)
+    @assert size(A_basis) == size(f_basis)
+    num_y_blocks, num_x_blocks = size(A_basis)
+    (
+        [B' * A_basis[y, x] * B for x in 1:num_x_blocks for y in 1:num_y_blocks],
+        [B' * f_basis[y, x] for x in 1:num_x_blocks for y in 1:num_y_blocks]
+    )
+end
+
+function compress_A_f_basis(B, A_basis, f_basis)
+    (
+        [B' * A_basis[i] * B for i in 1:length(A_basis)],
+        [B' * f_basis[i] for i in 1:length(A_basis)]
+    )
+end
+
+function apply_pod(vec_mu, compressed_A_basis, compressed_f_basis, B, model_spaces)
+    _, U, _, _ = model_spaces
+    A = sum(compressed_A_basis .* [vec_mu; 1.])
+    f = sum(compressed_f_basis .* [vec_mu; 1.])
+    return FEFunction(U, B * (A \ f))
 end
 
 function apply_pod(operator, B, model_spaces)

@@ -80,6 +80,23 @@ build_blocks_op(mu, model_spaces) = build_op(build_blocks_problem(mu)..., model_
 blocks_solution(mu, model_spaces) = solution(build_blocks_problem(mu)..., model_spaces)
 blocks_solution(mu, N::Integer) = blocks_solution(mu, build_model_spaces(N))
 
+function A_f_basis(num_y_blocks, num_x_blocks, model_spaces)
+    As = []
+    fs = []
+    fs_constant = nothing
+    for i in 1:(num_x_blocks * num_y_blocks)
+        mu_basis_vec = reshape(I(num_x_blocks * num_y_blocks)[i,:], (num_y_blocks, num_x_blocks))
+        op_basis_vec = get_algebraic_operator(build_blocks_op(mu_basis_vec, model_spaces))
+        push!(As, op_basis_vec.matrix)
+        push!(fs, zeros(size(op_basis_vec.vector)))
+        fs_constant = op_basis_vec.vector
+    end
+    As = reshape(As, (num_y_blocks, num_x_blocks))[:]
+    fs = reshape(fs, (num_y_blocks, num_x_blocks))[:]
+    push!(As, 0*I)
+    push!(fs, fs_constant)
+    As, fs
+end
 
 # function qoi(mu, N)
 #     sum(∫( solution(mu, N) )*dΓbase)
