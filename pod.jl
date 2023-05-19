@@ -1,5 +1,6 @@
 using Gridap.FESpaces: get_algebraic_operator
 using LinearAlgebra
+using ProgressBars
 
 include("high_fidelity.jl")
 
@@ -19,12 +20,16 @@ geom_range(start, stop, n) = 10 .^(range(log10(start), log10(stop), n))
 function pod_basis_multirank(training_solutions, model_spaces, ranks)
     V0, U, dΩ, dΓbase = model_spaces
     num_train = length(training_solutions)
-    C = Symmetric([sum(∫( ψm * ψq )*dΩ) for ψm in training_solutions, ψq in training_solutions])
+    println("Building C:")
+    # TODO: only fill top half of matrix
+    C = Symmetric([sum(∫( ψm * ψq )*dΩ) for ψm in training_solutions, ψq in ProgressBar(training_solutions)])
+    println("Taking SVD:")
     C_eigs = eigen(C, (num_train-maximum(ranks)+1):num_train)
+    println("Building Bs")
     Bs = Dict{Int, Any}(rank => (
         top_eigvecs = C_eigs.vectors[:, end-(rank - 1):end];
         reduce(hcat, [get_free_dof_values(sol) for sol in training_solutions]) * top_eigvecs
-    ) for rank in ranks)
+    ) for rank in ProgressBar(ranks))
     spectrum = reverse(max.(C_eigs.values, 0))
     energy_fractions = Dict{Int, Float64}(
         rank => sum(spectrum[1:rank])/sum(spectrum) for rank in ranks)

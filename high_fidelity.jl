@@ -25,7 +25,7 @@ function build_model_spaces(N)
     # Dirichlet along top
     U = TrialFESpace(V0, x -> 0)
 
-    degree = 2
+    degree = 1
     Ω = Triangulation(model)
     dΩ = Measure(Ω, degree)
 
