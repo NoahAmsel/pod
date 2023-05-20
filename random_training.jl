@@ -1,13 +1,8 @@
-using Distributions
 using ProgressBars
-using Random: MersenneTwister
 using Statistics: quantile
 
 include("experiment_utils.jl")
 include("pod.jl")
-
-# TODO: make this deterministic grid?
-mu_set(mu_shape, num, seed) = 10 .^ rand(MersenneTwister(seed), Uniform(-1, 1), (mu_shape..., num))
 
 function testing_errors(testing_mus, testing_solutions, A_basis, f_basis, B, model_spaces)
     @assert size(testing_mus)[3] == length(testing_solutions)
@@ -78,6 +73,15 @@ function blocks_random_training(mu_shape, train_ns, n_test, discretization_N, ra
     return left_p
 end
 
+# mu_shape = (2, 2)
+# train_ns = reverse([10, 20, 50])
+# n_test = 100
+# discretization_N = 50
+# ranks = 1:50
+# cd("/Users/noah/Documents/PhD1/Numerical Methods 2/Final/code")
+# p = blocks_random_training(mu_shape, train_ns, n_test, discretization_N, ranks)
+# savefig(p, "images/uniform_training/convergence_22.png")
+
 # mu_shape = (3, 3)
 # train_ns = reverse([50, 200])
 # n_test = 100
@@ -87,14 +91,14 @@ end
 # p = blocks_random_training(mu_shape, train_ns, n_test, discretization_N, ranks)
 # savefig(p, "images/uniform_training/convergence_N500_M200.png")
 
-# mu_shape = (2, 2)
-# train_ns = reverse([10, 20, 50])
+# mu_shape = (3, 3)
+# train_ns = reverse([25, 50, 100, 200])
 # n_test = 100
 # discretization_N = 50
-# ranks = 1:50
+# ranks = 1:200
 # cd("/Users/noah/Documents/PhD1/Numerical Methods 2/Final/code")
 # p = blocks_random_training(mu_shape, train_ns, n_test, discretization_N, ranks)
-# savefig(p, "images/uniform_training/convergence_small.png")
+# savefig(p, "images/uniform_training/convergence_N50_M100.png")
 
 # mu_shape = (3, 3)
 # train_ns = reverse([25, 50, 100])
@@ -105,11 +109,11 @@ end
 # p = blocks_random_training(mu_shape, train_ns, n_test, discretization_N, ranks)
 # savefig(p, "images/uniform_training/convergence_N50_M100.png")
 
-mu_shape = (3, 3)
-train_ns = reverse([10, 25, 50])
-n_test = 100
-discretization_N = 5
-ranks = 1:50
-cd("/Users/noah/Documents/PhD1/Numerical Methods 2/Final/code")
-p = blocks_random_training(mu_shape, train_ns, n_test, discretization_N, ranks)
-savefig(p, "images/uniform_training/convergence_N5_M50.png")
+# mu_shape = (3, 3)
+# train_ns = reverse([10, 25, 50])
+# n_test = 100
+# discretization_N = 5
+# ranks = 1:50
+# cd("/Users/noah/Documents/PhD1/Numerical Methods 2/Final/code")
+# p = blocks_random_training(mu_shape, train_ns, n_test, discretization_N, ranks)
+# savefig(p, "images/uniform_training/convergence_N5_M50.png")

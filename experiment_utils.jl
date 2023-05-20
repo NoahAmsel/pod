@@ -1,5 +1,7 @@
+using Distributions: Uniform
 using LaTeXStrings
 using Plots
+using Random: MersenneTwister
 
 function convergence_curve(approx, truth, rs)
     h2error = Dict{Float64, Float64}()
@@ -21,6 +23,12 @@ function log_ticks(data)
     10 .^ [log_min:step:(log_max - step); log_max]
 end
 
+function add_error_line(p, xs, error_fun, N, multiplier=1)
+    plot!(p, xs, error_fun(xs, N) * multiplier,
+        label=latexstring("N = $N") * (multiplier == 1 ? "" : ", scaled " * latexstring("\\times $multiplier"))
+    )
+end
+
 domain_plot(fun; levels=50) = contourf(
     0:.05:1,
     0:.05:1,
@@ -33,8 +41,5 @@ domain_plot(fun; levels=50) = contourf(
     dpi=300
 )
 
-function add_error_line(p, xs, error_fun, N, multiplier=1)
-    plot!(p, xs, error_fun(xs, N) * multiplier,
-        label=latexstring("N = $N") * (multiplier == 1 ? "" : ", scaled " * latexstring("\\times $multiplier"))
-    )
-end
+# TODO: make this deterministic grid?
+mu_set(mu_shape, num, seed) = 10 .^ rand(MersenneTwister(seed), Uniform(-1, 1), (mu_shape..., num))

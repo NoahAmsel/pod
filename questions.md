@@ -13,3 +13,5 @@
     - sparse matrix: matvec: O(n), inner product O(n)
     - what i have: inner product O(n), matvec O(n^2)
     - actually maybe this isn't a problem. because the reason it's cheap to compute the inner product is that there's a sparse matrix defined by the FE discretization. and if I can just access that matrix then i can do matvecs quickly
+
+- for N=5, why does the POD error go to zero for rank 20? the FE space has 32 degrees of freedom, not 20

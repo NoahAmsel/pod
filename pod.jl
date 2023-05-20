@@ -1,4 +1,5 @@
 using Gridap.FESpaces: get_algebraic_operator
+using IterativeSolvers: lobpcg
 using LinearAlgebra
 using ProgressBars
 
@@ -92,4 +93,19 @@ function residual_op_norm(mu, compressed_A_basis, compressed_f_basis, G)
     affine_mus = [mu[:]; 1.]
     little_r = [affine_mus; -kron(affine_mus, u_pod_reduced_basis)]
     little_r' * (G * little_r)
+end
+
+function exact_coercivity(mu, model_spaces)
+    test_op = build_blocks_op(mu, model_spaces)
+    a_mu = get_algebraic_operator(test_op).matrix
+    M = mass_matrix(model_spaces)
+    result = lobpcg(a_mu, M, false, 1, maxiter=20_000, tol=1e-2)
+    @assert result.converged
+    result.λ[1]
+end
+
+minθ_lower(mu, mu_prime, coerc_prime) = coerc_prime * min(minimum(mu ./ mu_prime), 1)
+function multi_param_minθ_lower(mu, train_mus, train_coercs)
+    @assert size(train_mus)[3] == length(train_coercs)
+    maximum(minθ_lower(mu, train_mus[:,:,i], train_coercs[i]) for i in 1:length(train_coercs))
 end
