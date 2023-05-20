@@ -29,7 +29,7 @@ function add_error_line(p, xs, error_fun, N, multiplier=1)
     )
 end
 
-domain_plot(fun; levels=50) = contourf(
+domain_plot(fun; levels=50, kwargs...) = contourf(
     0:.05:1,
     0:.05:1,
     (x, y) -> fun(Point([x, y])),
@@ -38,7 +38,8 @@ domain_plot(fun; levels=50) = contourf(
     ylabel=L"y",
     size=(400, 400),
     # aspect_ratio=:equal
-    dpi=300
+    dpi=300;
+    kwargs...
 )
 
 # TODO: make this deterministic grid?
