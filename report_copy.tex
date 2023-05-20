@@ -1,0 +1,304 @@
+\documentclass[11pt]{article}
+
+\usepackage{amsmath,amsthm,amssymb,graphicx}
+\usepackage{algorithm,algpseudocode} % https://www.overleaf.com/learn/latex/Algorithms
+\usepackage{tikz}
+\usepackage[margin=1.0in]{geometry}
+\usepackage{matlab-prettifier}
+\usepackage{adjustbox}
+\usepackage{hyperref}
+\usepackage{biblatex}
+\addbibresource{sample.bib}
+
+\newenvironment{problem}[2][Problem]{\begin{trivlist}
+\item[\hskip \labelsep {\bfseries #1}\hskip \labelsep {\bfseries #2.}]}{\end{trivlist}}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{observation}[theorem]{Observation}
+\newtheorem{hint}[theorem]{Hint}
+\newtheorem{disclaimer}[theorem]{Disclaimer}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{claim}[theorem]{Claim}
+\newtheorem{fact}[theorem]{Fact}
+\newtheorem{assumption}[theorem]{Assumption}
+\newtheorem{warning}[theorem]{Warning}
+\newtheorem{conjecture}[theorem]{Conjecture}
+
+\newcommand{\code}[1]{\texttt{#1}}
+\DeclareMathOperator*{\argmax}{argmax} % thin space, limits underneath in displays
+\DeclareMathOperator*{\argmin}{argmin} % thin space, limits underneath in displays
+
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\Q}{\mathbb{Q}}
+\newcommand{\C}{\mathbb{C}}
+
+\newcommand{\power}{\mathcal{P}}
+
+\newcommand{\inner}[1]{\left \langle #1 \right \rangle}
+\newcommand{\set}[1]{\left \{ #1 \right \}}
+\def\abs#1{\left|#1  \right|}
+\def\norm#1{\left\| #1 \right\|}
+
+\newcommand{\limn}{\lim_{n \to \infty}}
+\newcommand{\sumn}{\sum_{n=1}^\infty}
+\newcommand{\sumin}{\sum_{i=1}^n}
+\newcommand{\sumim}{\sum_{i=1}^m}
+\newcommand{\sumjn}{\sum_{j=1}^n}
+\newcommand{\sumjm}{\sum_{j=1}^m}
+\newcommand{\e}{\epsilon}
+
+\newcommand{\infnorm}[1]{\norm{#1}_{\infty}}
+\newcommand{\ellnorm}[1]{\norm{#1}_{\ell^2}}
+\newcommand{\Lnorm}[1]{\norm{#1}_{L^2}}
+\newcommand{\opnorm}[1]{\norm{#1}_{\mathrm{op}}}
+\newcommand{\ones}{\mathbf{1}}
+\newcommand{\zeros}{\mathbf{0}}
+
+\def\trace#1{\mathrm{Tr} \left(#1 \right)}
+\def\ceil#1{\left\lceil #1 \right\rceil}
+\def\floor#1{\left\lfloor #1 \right\rfloor}
+\def\prob#1{\mbox{Pr}\left[ #1 \right]}
+\newcommand{\E}{\mbox{{\bf E}}}
+
+\graphicspath{ {./code/images/} }
+
+\begin{document}
+
+\title{Reduced Basis Methods for Parameterized PDEs}
+\author{Noah Amsel\\
+Numerical Methods II}
+\maketitle
+
+In many cases, one must find the solution to a parameterized PDE
+quickly for a large number of different parameter settings.
+One common example is uncertainty quantification:
+when the true value of the parameters is unknown, the probability distribution of the solutions
+can be estimated by a Monte Carlo method that repeatedly samples the parameters from some distribution
+and solves the PDE.
+Another is optimization: when optimizing over the space of parameters using an
+iterative method, the PDE must be solved with different parameters in each iteratino.
+However, in these cases, solving the PDE from scratch using a highly accurate model over and over is prohibitively expensive.\\
+
+Reduced Basis Methods can be used to make this kind of computation tractible.
+The general form of these methods is as follows:
+In the preprocessing or offline step, the PDE is solved using a high-fidelity model
+for some number of different parameter settings.
+Care is taken to ensure that this set of problems is large enough to provide good coverage
+of the space of parameters we are likely to encounter, while still not being so large that this step becomes intractible.
+In this paper, I will call these solutions ``the training set''.
+Next, these train solutions are used to construct a basis that is relatively low dimensional but still captures
+much of the space of possible solutions.
+Then, during the online stage, this basis is used to compress the solution operator so that it is quick to apply.
+While this compressed solution operator will not be as accurate as solving the PDE from scratch using a high fidelity method,
+if our basis is constructed well it can still provide sufficient accuracy for many applications at a fraction of the cost.\\
+
+In this project, I implement a Reduced Basis Method for solving a Laplace's equation with variable coefficinets in 2D.
+I follow closely the treatment of \cite{certified}, though with a slight modification to the problem set up as presented in \cite{other}.
+
+\section{The Problem}
+We consider the steady state head problem on a 2D square with variable
+thermal conductivity.
+Let the domain be $\Omega = [0, 1] \times [0, 1]$.
+Divide the domain into nine blocks, arranged in a $3\times 3$ grid.
+The first block is $[0, \frac13] \times [0, \frac13]$ and the last is $[\frac23, 1] \times [\frac23, 1]$.
+We assume that the thermal conductivity varies across the domain but is constant on each of the nine blocks.
+Let $\mu \in \R^9$ be a vector of parameters corresponding to the thermal conductivity of each block.
+Then we let $\kappa_{\mu} : \Omega \to \R$ be this piecewise-constant thermal conductivity function.
+Finally, we divide the boundary of the domain into three parts: the top $\Gamma_{\mathrm{top}}$, the sides $\Gamma_{\mathrm{sides}}$,
+and the bottom $\Gamma_{\mathrm{bottom}}$.\\
+
+The problem we wish to solve is as follows: for a given $\mu$, find $u \in H^1(\Omega)$ such that
+\begin{align*}
+    \nabla(\kappa_{\mu} \cdot \nabla u) &= 0 &\text{on } \Omega\\
+    u &= 0 &\text{on } \Gamma_{\mathrm{top}}\\
+    \nabla u \cdot n &= 0 &\text{on } \Gamma_{\mathrm{sides}}\\
+    \nabla u \cdot n &= 1 &\text{on } \Gamma_{\mathrm{base}}
+\end{align*}
+We now reexpress this problem in the weak form.
+Let $\mathbb V = \set{u \in H^1(\Omega) \mid u(x, y) = 0 \quad \forall (x, y) \in \Gamma_{\mathrm{top}}}$
+be the subset of the function space that satisfies the Dirichlet boundary condition.
+Define the bilinear form $a_{\mu}: \mathbb V \times \mathbb V \to \R$
+and the linear form $f_{\mu} : \mathbb V \to \R$ as follows:
+\begin{align*}
+    a_{\mu}(w, v) &= \int_{\Omega} \kappa_{\mu} \inner{\nabla w, \nabla v} \cdot d\Omega\\
+    f_{\mu}(v) &= \int_{\Gamma_{\mathrm{base}}} v \cdot d\Gamma_{\mathrm{base}}
+\end{align*}
+Then for a given $\mu$, we wish to find $u \in \mathbb V$ such that
+\begin{equation}\label{eq:inf_dim}
+    a_{\mu}(v, u) = f_{\mu}(v) \quad \forall v \in \mathbb V
+\end{equation}
+Note that for our particular problem, $f_{\mu}$ does not actually depend on $\mu$.
+We keep the subscript anyway for generality.
+
+\section{High Fidelity Solver}
+To solve this problem with high accuracy, we use the finite elements method.
+First, we discretize $\Omega$ using a $N \times N$ grid of square cells.
+Next, we let $\mathbb V_N$ be the space of piecewise polynomial functions of these cells.
+In my code, I choose piecewise linear functions for simplicity.
+Let $\set{\phi_i}_{i=1}^n$ be the canonical FE basis for $\mathbb V_N$.
+(Note that the size of this basis $n$ does not equal the size of the discretization $N$;
+however $n = O(N^2)$ as there are a constant number of degrees of freedom per cell.)
+Now we use a Galerkin approach to replace the infinite dimensional system \ref{eq:inf_dim}
+with the following finite dimensional problem: for a given $\mu$,
+find $u \in \mathbb V_n$ such that
+\begin{equation}
+    a_{\mu}(v, u) = f_{\mu}(v) \quad \forall v \in \mathbb V_N
+\end{equation}
+We represent functions $v \in \mathbb V_N$ by vectors $\vec v \in \R^n$, so that
+\[ v = \sumin \vec v_i \phi_i = \Phi \vec v \]
+where $\Phi \in \mathbb V_N \times \R^n$ is a pseudo-matrix.
+Thus we can discretize the operators $a_{\mu}$ and $f_{\mu}$
+by defining $A_{\mu} \in \R^{n \times n}$ and $\vec f_{\mu} \in \R^n$ as follows:
+\begin{align*}
+    a_{\mu}(v, u) &= a_{\mu}(\Phi \vec v, \Phi \vec u) = \sumin \sumjn \vec v_i a_{\mu}(\phi_i, \phi_j) \vec u_j =: \sumin \sumjn \vec v_i A_{\mu, ij} \vec u_j = \vec v^\top A_{\mu} \vec u\\
+    f_{\mu}(v) &= \sumin \vec v_i f_{\mu}(\phi_i) =: \vec v^\top \vec f_{\mu}
+\end{align*}
+To solve the PDE, we simply solve the system
+\[ A_{\mu} \vec u = \vec f_{\mu} \]
+
+\subsection{Implementation and Validation}
+I use the Julia library \texttt{Gridap.jl} \cite{Badia2020} to instantiate this finite element solver.
+Given $N$ and $\kappa_{\mu}$, it handles the discretization of $\Omega$
+and the construction of $A_{\mu}$ and $\vec f_{\mu}$.
+Since $A_{\mu}$ is sparse, it can be constructed in $O(n)$.
+I use the standard backslash operator to solving this sparse linear system efficiently.\\
+
+To validate solver, I use the method of manufactured solutions.
+To make the problem analytically tractible, I set $\kappa = 1$ everywhere.
+However, this change makes the solution trivial.
+To get a more interesting function that better tests the solver,
+I replace the constant Neumann condition on the base by
+\[ \nabla u(x,y) \cdot n = 2\pi \cos(2\pi x) \quad x \in \Gamma_{\mathrm{base}} \]
+The solution to the problem is then
+\[ u(x, y) = \cos(2\pi x) \cdot \sinh(2\pi (1-y)) / \cosh(2\pi) \]
+This analytic solution is plotted in Figure \ref{fig:analytic}:
+\begin{figure}\label{fig:analytic}
+    \centering
+    \includegraphics[width=0.7\textwidth]{manufactured/true_solution}
+    \caption{Solution to manufactured problem with constant $\kappa$ but nontrivial Neumann boundary condition on the base.}
+\end{figure}
+
+Figure \ref{fig:manufactured_convergence} shows that as $N$ increases,
+the finite elements solution converges at second order to the analytic solution.
+The top panel plots the error function along the base for increasing $N$,
+while the bottom shows the convergence of the global $L^2$ error.
+The error decreases extremely regularly; The method is stable for small $N$, large $N$, and eveyrthing in between. 
+\begin{figure}\label{fig:manufactured_convergence}
+    \centering
+    \includegraphics[width=0.85\textwidth]{manufactured/error_bottom_convergence}
+    \includegraphics[width=0.85\textwidth]{manufactured/global_convergence}
+    \caption{The finite element solution exhibits second order convergence to the analytic solution.
+    In the top panel, note that even just using piecewise constants, we expect the finite element solution to intersect
+    the analytic solution in each cell. This accounts for the highly oscilliatory error function.
+    In the bottom panel, $h = 1/N$.}
+\end{figure}
+
+\section{Reduced Basis Method}
+\subsection{Proper Orthogonal Decomposition}
+Assume that we have a set of $m$ training solutions $\set{u_1, \ldots, u_m}$
+corresponding to $m$ different settings of $\mu$.
+Our goal is to construct a low dimension basis from these solutions that
+will allow us to compress the solution operator.
+We do this by a process closely akin to the SVD. \\
+
+Assemble the vector representations of the training solutions into a matrix:
+\[ U = \begin{bmatrix}\vline && \vline \\ \vec u_1 & \cdots & \vec u_m \\\vline && \vline \end{bmatrix} \in \R^{n \times m} \]
+We cannot simply perform the SVD on $U$ because we do not wish to orthogonalize with respect to the standard inner product $\inner{u, u'}_2$ in $\R^n$.
+Rather, we want to use the $L^2$ inner product $\inner{\Phi \vec u, \Phi \vec u'}_{L^2}$.
+To simplify this, we define the mass matrix $M \in \R^{n \times n}$ corresponding to our finite element space $\mathbb V_N$ by
+\[ \inner{v, u}_{L^2} = \inner{\Phi \vec v, \Phi \vec u'}_{L^2} = \vec v^\top \Phi^\top \Phi \vec u =: \vec v^\top M \vec u \]
+Like $A_{\mu}$, $M$ is a sparse matrix and can be constructed efficiently using \texttt{Gridap.jl}.
+We can now form the ($L^2$) correlation matrix $C \in \R^{m \times m}$ as follows:
+\[ C = U^\top \Phi^\top \Phi U = U^\top M U \]
+This takes time $O(nm^2)$.
+The eigenvectors of $C$ are like the right singular values of $U$:
+\[ C = \Theta \Lambda \Theta^\top \]
+Finding them all would take $O(m^3)$. However, if we believe that the
+true solution manifold can be sufficiently well-represented with fewer than $m$
+dimensions, we can improve robustness and speed in both the offline and online stages
+by selecting some rank $r$ and taking only the top $r$ eigenvectors.
+Julia provides an interface to LAPACK, which still uses an $O(m^3)$
+method that reduces to tridiagonal form. But since we only need the top eigenvectors,
+we could in principle do something fancier to reduce the cost.
+Finally, we convert our set of top right singular vectors into the set of top left singular vectors
+by multiplying with $U$.
+These will form our basis. We assemble it as a matrix $B \in \R^{n \times r}$:
+\[ B = U \Theta_{1:r} \]
+
+\subsection{Compressing the Solution Operator}
+The high fidelity solver finds $\vec u \in \R^n$ such that $A_{\mu} \vec u = \vec f_{\mu}$.
+To speed up the solver, we now make the key assumption that both the solution $\vec u$ and 
+the test functions from the Galerkin formulation lie in the span of our basis $B$.
+That is, $\vec u  = B \widehat u$, $\vec v = B \widehat v$ for some $\widehat u, \widehat v \in \R^r$.
+The compressed problem is to find $\widehat u \in \R^r$ such that
+\[ \widehat v^\top B^\top A_{\mu} B \widehat u = \widehat v^\top B^\top f_{\mu} \quad \forall \widehat v \in \R^r \]
+That is, $\widehat u = (B^\top A_{\mu} B)^{-1} B^\top f =: \widehat A_{\mu}^{-1} \widehat f_{\mu}$ with $\widehat A_{\mu} \in \R^{r \times r}, \widehat f \in \R^{r}$ defined appropriately.
+Once $\widehat A_{\mu}$ and $\widehat f_{\mu}$ are assembled, the system can be solved in only $O(r^3)$.
+However, assembling $\widehat A_{\mu}$ costs $O(nr^2)$ (since $A_{\mu}$ is sparse),
+which still depends on $n$. This is too slow, since this step would need to be repeated for each $\mu$ during the online phase.\\
+
+We can use our knowledge of the structure of $A_{\mu}$ to avoid this bottleneck.
+In many cases, $A_{\mu}$ and $\vec f_{\mu}$ are affine combinations of a small number of
+basis elements that do not depend on $\mu$ --- only the coefficients of this affine combination depend on $\mu$.
+Our problem is even nicer; $A_{\mu}$ is a linear combination of $9$ matrices weighted by the elements of $\mu$
+and $\vec f_{\mu}$ is, as noted above, completely independent of $\mu$:
+\begin{align*}
+    A_{\mu} &= \sum_{i = 1}^9 \mu_i A_i\\
+    \vec f_{\mu} &= \vec f
+\end{align*}
+Thus, we can compress each of the basis elements during the offline stage:
+\begin{align*}
+    \widehat A_i &= B^\top A_i B \qquad i = 1, \ldots, 9\\
+    \widehat f &= B^\top \vec f
+\end{align*}
+During the online stage, we can quickly construct $\widehat A_{\mu}$ using
+\[ \widehat A_{\mu} \sum_{i = 1}^9 \mu_i \widehat A_i \]
+Thus, solving each problem during the online stage takes only $O(r^3)$.
+If we want to assemble the solution function to the original problem --- for example, to
+be able to query it at any arbitrary point --- we must still compute
+$\vec u = B \widehat u$, which will take $O(nr)$.
+However, in many practical applications we do not actually care about assembling the
+solution function, but only about measuring some quantity of interest of the function such as its
+total energy, its mean, or its value at a certain predetermined point.
+If this quantity of interest is a (multi-)linear functional, then it can be compressed
+using our same technique and computed for any $\mu$ in time independent of $n$. \\
+
+\subsection{Experiments}
+In all my experiments, the $\mu$s used in both training and testing
+were generated iid from a log uniform distribution on the interval $[\frac1{10}, 10]$.
+I chose this distribution because these $\mu$s are multiplicative constants, so it seems intuitive that they should be
+centered about $1$ with respect to the geometric mean. I used a log uniform instead of,
+e.g., a log normal distribution because I wanted to generate plenty of examples with large jumps in the value of $\mu$.
+This makes for a more varied and challenging solution set.
+
+
+For greater consistency, I set random seeds so that the series of generated training $\mu$s and testing $\mu$s
+are the same across runs. This ensures that comparisons are fair, since each run is trained on 
+datasets that are as alike as possible (when they are different sizes, one is always a subset of the other)
+and tested on an equally hard test sets.
+In all experiments with multiple test problems, I set the size of the test dataset to 1000.
+(maybe: i noticed )
+
+There are two parameters we can manipulate to trade off the quality of our solutions
+with runtime. Increasing the rank $r$ increases
+the number of functions that can be represented in our reduced basis,
+allowing our approximation to get closer to the true solution.
+However, it also increases the runtime of the online phase and if taken to an
+extreme, a large rank can introduce some instability and numerical artifacts.
+Increasing the number of training examples $m$ helps the method more accurately
+identify the best basis. As $m$ grows, the variance of the estimated basis goes to zero
+and it approaches the best rank $r$ basis of the true underlying solution manifold.
+Increasing $m$ increases the runtime of the offline stage but not the online stage.
+
+\begin{figure}
+    \centering
+    \includegraphics{}
+    \caption{hh}
+\end{figure}
+\printbibliography
+\end{document}

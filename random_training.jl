@@ -71,7 +71,7 @@ end
 
 mu_shape = (3, 3)
 train_ns = reverse([50, 100, 200, 400])
-n_test = 10000
+n_test = 1000
 discretization_N = 500
 ranks = 10:10:200
 cd("/Users/noah/Documents/PhD1/Numerical Methods 2/Final/code")
