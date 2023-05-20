@@ -39,8 +39,8 @@ println(sqrt(sum(∫(r̂_fun * r̂_fun) * dΩ)))
 # norm(a_mu * true_u - f_mu)
 #########
 
-Cold = Symmetric([sum(∫( ψm * ψq )*dΩ) for ψm in training_solutions, ψq in training_solutions])
+# Cold = Symmetric([sum(∫( ψm * ψq )*dΩ) for ψm in training_solutions, ψq in training_solutions])
 
-M = mass_matrix(model_spaces)
-solution_mat = reduce(hcat, get_free_dof_values(sol) for sol in training_solutions)
-Cnew = solution_mat' * (M * solution_mat)
+# M = mass_matrix(model_spaces)
+# solution_mat = reduce(hcat, get_free_dof_values(sol) for sol in training_solutions)
+# Cnew = solution_mat' * (M * solution_mat)

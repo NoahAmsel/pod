@@ -2,6 +2,7 @@ using Gridap.FESpaces: get_algebraic_operator
 using IterativeSolvers: lobpcg
 using LinearAlgebra
 using ProgressBars
+using SparseArrays: sparse
 
 include("high_fidelity.jl")
 
@@ -98,7 +99,8 @@ function exact_coercivity(mu, model_spaces)
     test_op = build_blocks_op(mu, model_spaces)
     a_mu = get_algebraic_operator(test_op).matrix
     M = mass_matrix(model_spaces)
-    result = lobpcg(a_mu, M, false, 1, maxiter=20_000, tol=1e-2)
+    result = lobpcg(a_mu, M, false, 1, maxiter=20_000, tol=1e-4)
+    # result = lobpcg(a_mu' * M * a_mu, M, false, 1, maxiter=20_000, tol=1e-4)
     @assert result.converged
     result.λ[1]
 end
@@ -107,4 +109,8 @@ minθ_lower(mu, mu_prime, coerc_prime) = coerc_prime * min(minimum(mu ./ mu_prim
 function multi_param_minθ_lower(mu, train_mus, train_coercs)
     @assert size(train_mus)[3] == length(train_coercs)
     maximum(minθ_lower(mu, train_mus[:,:,i], train_coercs[i]) for i in 1:length(train_coercs))
+end
+
+function L2error_bound(mu, compressed_A_basis, compressed_f_basis, G, train_mus, train_coercs)
+    residual_op_norm(mu, compressed_A_basis, compressed_f_basis, G) / multi_param_minθ_lower(mu, train_mus, train_coercs)
 end
