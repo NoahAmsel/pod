@@ -43,3 +43,16 @@ domain_plot(fun; levels=50) = contourf(
 
 # TODO: make this deterministic grid?
 mu_set(mu_shape, num, seed) = 10 .^ rand(MersenneTwister(seed), Uniform(-1, 1), (mu_shape..., num))
+
+function testing_errors(testing_mus, testing_solutions, A_basis, f_basis, B, model_spaces)
+    @assert size(testing_mus)[3] == length(testing_solutions)
+    compressed_A_basis, compressed_f_basis = compress_A_f_basis(B, A_basis, f_basis)
+    collect(Float64,
+        (
+            mu = testing_mus[:, :, i];
+            pod_approx = apply_pod(mu, compressed_A_basis, compressed_f_basis, B, model_spaces);
+            error_fun = pod_approx - testing_solutions[i];
+            sqrt(sum( ∫( error_fun * error_fun )*model_spaces[3] ))
+        ) for i in 1:size(testing_mus)[3]
+    )
+end

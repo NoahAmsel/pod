@@ -77,9 +77,8 @@ function apply_pod(operator, B, model_spaces)
     return FEFunction(U, B * ((B' * A * B) \ (B' * f)))
 end
 
-function build_G(mu, B, model_spaces)
-    _, U, dΩ, _ = model_spaces
-    A_basis, f_basis = A_f_basis(size(mu)..., model_spaces)
+function build_G(mu_size, B, model_spaces)
+    A_basis, f_basis = A_f_basis(mu_size..., model_spaces)
     # TODO: below can be written as a matrix instead of vector of vectors
     # TODO: in our case Aq is symmetric, but properly shouldn't it be ξ' * Aq?
     R_list = [f_basis; [Aq * ξ for Aq in A_basis for ξ in eachcol(B)]]
@@ -92,7 +91,7 @@ function residual_op_norm(mu, compressed_A_basis, compressed_f_basis, G)
     u_pod_reduced_basis = pod_compressed_solve(mu, compressed_A_basis, compressed_f_basis)
     affine_mus = [mu[:]; 1.]
     little_r = [affine_mus; -kron(affine_mus, u_pod_reduced_basis)]
-    little_r' * (G * little_r)
+    sqrt(little_r' * (G * little_r))
 end
 
 function exact_coercivity(mu, model_spaces)

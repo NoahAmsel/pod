@@ -4,19 +4,6 @@ using Statistics: quantile
 include("experiment_utils.jl")
 include("pod.jl")
 
-function testing_errors(testing_mus, testing_solutions, A_basis, f_basis, B, model_spaces)
-    @assert size(testing_mus)[3] == length(testing_solutions)
-    compressed_A_basis, compressed_f_basis = compress_A_f_basis(B, A_basis, f_basis)
-    collect(Float64,
-        (
-            mu = testing_mus[:, :, i];
-            pod_approx = apply_pod(mu, compressed_A_basis, compressed_f_basis, B, model_spaces);
-            error_fun = pod_approx - testing_solutions[i];
-            sqrt(sum( ∫( error_fun * error_fun )*model_spaces[3] ))
-        ) for i in 1:size(testing_mus)[3]
-    )
-end
-
 function blocks_random_training(mu_shape, train_ns, n_test, discretization_N, ranks)
     model_spaces = build_model_spaces(discretization_N)
     training_mus = mu_set(mu_shape, maximum(train_ns), 42)
@@ -54,7 +41,7 @@ function blocks_random_training(mu_shape, train_ns, n_test, discretization_N, ra
     testing_solutions = [blocks_solution(testing_mus[:,:,i], model_spaces) for i in ProgressBar(1:size(testing_mus)[3])]
     for subtrain_size in train_ns
         testing_ranks = filter(r -> r <= subtrain_size, ranks)
-        Bs, energy_fractions = pod_basis_multirank(training_solutions[1:subtrain_size], model_spaces, testing_ranks)        
+        Bs, energy_fractions = pod_basis_multirank(training_solutions[1:subtrain_size], model_spaces, testing_ranks)
         error_5p = []
         error_median = []
         error_95p = []

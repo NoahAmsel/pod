@@ -37,7 +37,8 @@ p = scatter(
     legend=false,
     # yticks=log_ticks(test_coercs),
     yticks=[1/sqrt(10), 1, sqrt(10), 10],
-    title="True Coercivity vs. Lower Bound\n(100 training samples)"
+    title="True Coercivity vs. Lower Bound\n(100 training samples)",
+    dpi=300
 )
 plot!(p, [minimum(lower100), maximum(lower100)], [minimum(lower100), maximum(lower100)])
 cd("/Users/noah/Documents/PhD1/Numerical Methods 2/Final/code")
