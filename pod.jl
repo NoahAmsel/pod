@@ -44,15 +44,6 @@ function pod_basis(training_solutions, model_spaces, rank)
 end
 
 function compress_A_f_basis(B, A_basis, f_basis)
-    @assert size(A_basis) == size(f_basis)
-    num_y_blocks, num_x_blocks = size(A_basis)
-    (
-        [B' * A_basis[y, x] * B for x in 1:num_x_blocks for y in 1:num_y_blocks],
-        [B' * f_basis[y, x] for x in 1:num_x_blocks for y in 1:num_y_blocks]
-    )
-end
-
-function compress_A_f_basis(B, A_basis, f_basis)
     (
         [B' * A_basis[i] * B for i in 1:length(A_basis)],
         [B' * f_basis[i] for i in 1:length(A_basis)]

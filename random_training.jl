@@ -62,34 +62,34 @@ end
 
 # mu_shape = (2, 2)
 # train_ns = reverse([10, 20, 50])
-# n_test = 100
+# n_test = 1000
 # discretization_N = 50
 # ranks = 1:50
 # cd("/Users/noah/Documents/PhD1/Numerical Methods 2/Final/code")
 # p = blocks_random_training(mu_shape, train_ns, n_test, discretization_N, ranks)
 # savefig(p, "images/uniform_training/convergence_22.png")
 
-# mu_shape = (3, 3)
-# train_ns = reverse([50, 200])
-# n_test = 100
-# discretization_N = 500
-# ranks = 10:10:200
-# cd("/Users/noah/Documents/PhD1/Numerical Methods 2/Final/code")
-# p = blocks_random_training(mu_shape, train_ns, n_test, discretization_N, ranks)
-# savefig(p, "images/uniform_training/convergence_N500_M200.png")
+mu_shape = (3, 3)
+train_ns = reverse([50, 100, 200, 400])
+n_test = 10000
+discretization_N = 500
+ranks = 10:10:200
+cd("/Users/noah/Documents/PhD1/Numerical Methods 2/Final/code")
+p = blocks_random_training(mu_shape, train_ns, n_test, discretization_N, ranks)
+savefig(p, "images/uniform_training/convergence_N500_M400.png")
 
-# mu_shape = (3, 3)
-# train_ns = reverse([25, 50, 100, 200])
-# n_test = 100
-# discretization_N = 50
-# ranks = 1:200
-# cd("/Users/noah/Documents/PhD1/Numerical Methods 2/Final/code")
-# p = blocks_random_training(mu_shape, train_ns, n_test, discretization_N, ranks)
-# savefig(p, "images/uniform_training/convergence_N50_M100.png")
+mu_shape = (3, 3)
+train_ns = reverse([25, 50, 100, 200])
+n_test = 1000
+discretization_N = 50
+ranks = 10:10:200
+cd("/Users/noah/Documents/PhD1/Numerical Methods 2/Final/code")
+p = blocks_random_training(mu_shape, train_ns, n_test, discretization_N, ranks)
+savefig(p, "images/uniform_training/convergence_N50_M200.png")
 
 # mu_shape = (3, 3)
 # train_ns = reverse([25, 50, 100])
-# n_test = 100
+# n_test = 1000
 # discretization_N = 50
 # ranks = 1:100
 # cd("/Users/noah/Documents/PhD1/Numerical Methods 2/Final/code")
@@ -98,7 +98,7 @@ end
 
 # mu_shape = (3, 3)
 # train_ns = reverse([10, 25, 50])
-# n_test = 100
+# n_test = 1000
 # discretization_N = 5
 # ranks = 1:50
 # cd("/Users/noah/Documents/PhD1/Numerical Methods 2/Final/code")
