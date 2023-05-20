@@ -21,8 +21,9 @@ function pod_basis_multirank(training_solutions, model_spaces, ranks)
     V0, U, dΩ, dΓbase = model_spaces
     num_train = length(training_solutions)
     println("Building C:")
-    # TODO: only fill top half of matrix
-    C = Symmetric([sum(∫( ψm * ψq )*dΩ) for ψm in training_solutions, ψq in ProgressBar(training_solutions)])
+    M = mass_matrix(model_spaces)
+    solution_mat = reduce(hcat, get_free_dof_values(sol) for sol in training_solutions)
+    C = Symmetric(solution_mat' * (M * solution_mat))
     println("Taking SVD:")
     C_eigs = eigen(C, (num_train-maximum(ranks)+1):num_train)
     println("Building Bs")
@@ -80,16 +81,10 @@ function build_G(mu, B, model_spaces)
     A_basis, f_basis = A_f_basis(size(mu)..., model_spaces)
     # TODO: below can be written as a matrix instead of vector of vectors
     # TODO: in our case Aq is symmetric, but properly shouldn't it be ξ' * Aq?
-    R_vec = [f_basis; [Aq * ξ for Aq in A_basis for ξ in eachcol(B)]]
-    # Question: below works the same whether we use U or V0... why?
-    R_fun = [FEFunction(U, r) for r in R_vec]
-    G = Matrix{Float64}(undef, length(R_fun), length(R_fun))
-    for i in 1:length(R_fun)
-        for j in 1:length(R_fun)
-            G[i,j] = sum(∫(R_fun[i] * R_fun[j]) * dΩ)
-        end
-    end
-    return sparse(G)  # TODO: is this actually worth it?
+    R_list = [f_basis; [Aq * ξ for Aq in A_basis for ξ in eachcol(B)]]
+    R = sparse(reduce(hcat, R_list))  # TODO: is this actually worth it?
+    M = mass_matrix(model_spaces)
+    R' * M * R
 end
 
 function residual_op_norm(mu, compressed_A_basis, compressed_f_basis, G)

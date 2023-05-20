@@ -36,6 +36,12 @@ function build_model_spaces(N)
     return V0, U, dΩ, dΓbase
 end
 
+function mass_matrix(model_spaces)
+    V0, U, dΩ, _ = model_spaces
+    V_inner(u, v) = ∫(u * v) * dΩ
+    return get_algebraic_operator(AffineFEOperator(V_inner, v -> 0, U, V0)).matrix
+end
+
 function build_op(base_directed_grad, kappa, model_spaces)
     V0, U, dΩ, dΓbase = model_spaces
 
