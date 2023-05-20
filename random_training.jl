@@ -6,6 +6,7 @@ using Statistics: quantile
 include("experiment_utils.jl")
 include("pod.jl")
 
+# TODO: make this deterministic grid?
 mu_set(mu_shape, num, seed) = 10 .^ rand(MersenneTwister(seed), Uniform(-1, 1), (mu_shape..., num))
 
 function testing_errors(testing_mus, testing_solutions, A_basis, f_basis, B, model_spaces)
@@ -14,7 +15,7 @@ function testing_errors(testing_mus, testing_solutions, A_basis, f_basis, B, mod
     collect(Float64,
         (
             mu = testing_mus[:, :, i];
-            pod_approx = apply_pod(mu[:], compressed_A_basis, compressed_f_basis, B, model_spaces);
+            pod_approx = apply_pod(mu, compressed_A_basis, compressed_f_basis, B, model_spaces);
             error_fun = pod_approx - testing_solutions[i];
             sqrt(sum( ∫( error_fun * error_fun )*model_spaces[3] ))
         ) for i in 1:size(testing_mus)[3]
@@ -105,10 +106,10 @@ end
 # savefig(p, "images/uniform_training/convergence_N50_M100.png")
 
 mu_shape = (3, 3)
-train_ns = reverse([25, 50, 100])
+train_ns = reverse([10, 25, 50])
 n_test = 100
 discretization_N = 5
-ranks = 1:100
+ranks = 1:50
 cd("/Users/noah/Documents/PhD1/Numerical Methods 2/Final/code")
 p = blocks_random_training(mu_shape, train_ns, n_test, discretization_N, ranks)
-savefig(p, "images/uniform_training/convergence_N5_M100.png")
+savefig(p, "images/uniform_training/convergence_N5_M50.png")

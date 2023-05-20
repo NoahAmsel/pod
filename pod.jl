@@ -37,7 +37,7 @@ function pod_basis_multirank(training_solutions, model_spaces, ranks)
 end
 
 function pod_basis(training_solutions, model_spaces, rank)
-    return pod_basis_multirank(training_solutions, model_spaces, [rank])[rank]
+    return pod_basis_multirank(training_solutions, model_spaces, [rank])[1][rank]
 end
 
 function compress_A_f_basis(B, A_basis, f_basis)
@@ -56,11 +56,16 @@ function compress_A_f_basis(B, A_basis, f_basis)
     )
 end
 
-function apply_pod(vec_mu, compressed_A_basis, compressed_f_basis, B, model_spaces)
+function pod_compressed_solve(mu, compressed_A_basis, compressed_f_basis)
+    A = sum(compressed_A_basis .* [mu[:]; 1.])
+    f = sum(compressed_f_basis .* [mu[:]; 1.])
+    A \ f    
+end
+
+function apply_pod(mu, compressed_A_basis, compressed_f_basis, B, model_spaces)
     _, U, _, _ = model_spaces
-    A = sum(compressed_A_basis .* [vec_mu; 1.])
-    f = sum(compressed_f_basis .* [vec_mu; 1.])
-    return FEFunction(U, B * (A \ f))
+    u_coeffs = pod_compressed_solve(mu, compressed_A_basis, compressed_f_basis)
+    return FEFunction(U, B * u_coeffs)
 end
 
 function apply_pod(operator, B, model_spaces)
@@ -70,9 +75,26 @@ function apply_pod(operator, B, model_spaces)
     return FEFunction(U, B * ((B' * A * B) \ (B' * f)))
 end
 
-# B = pod_basis(training_solutions, model_spaces, 10)
-# new_op = build_circle_op([7, 30], model_spaces)
-# new_sol = apply_pod(new_op, B, model_spaces)
-# new_sol_hifi = solve(new_op)
-# error_fun = new_sol - new_sol_hifi
-# sqrt(sum( ∫( error_fun * error_fun )*model_spaces[3] ))
+function build_G(mu, B, model_spaces)
+    _, U, dΩ, _ = model_spaces
+    A_basis, f_basis = A_f_basis(size(mu)..., model_spaces)
+    # TODO: below can be written as a matrix instead of vector of vectors
+    # TODO: in our case Aq is symmetric, but properly shouldn't it be ξ' * Aq?
+    R_vec = [f_basis; [Aq * ξ for Aq in A_basis for ξ in eachcol(B)]]
+    # Question: below works the same whether we use U or V0... why?
+    R_fun = [FEFunction(U, r) for r in R_vec]
+    G = Matrix{Float64}(undef, length(R_fun), length(R_fun))
+    for i in 1:length(R_fun)
+        for j in 1:length(R_fun)
+            G[i,j] = sum(∫(R_fun[i] * R_fun[j]) * dΩ)
+        end
+    end
+    return sparse(G)  # TODO: is this actually worth it?
+end
+
+function residual_op_norm(mu, compressed_A_basis, compressed_f_basis, G)
+    u_pod_reduced_basis = pod_compressed_solve(mu, compressed_A_basis, compressed_f_basis)
+    affine_mus = [mu[:]; 1.]
+    little_r = [affine_mus; -kron(affine_mus, u_pod_reduced_basis)]
+    little_r' * (G * little_r)
+end
